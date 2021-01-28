@@ -1,0 +1,19 @@
+
+
+#navBar{
+   height: 5vh;
+   padding: 5%;
+   /*margin-bottom: 100px; */
+}
+
+#mapid { 
+    height: 90vh;
+    margin-top: 15vh;
+
+ }
+#countryFlag{
+   height: 30px;
+   padding-left: 10px;
+}
+
+
