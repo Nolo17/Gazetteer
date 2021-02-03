@@ -3,6 +3,22 @@
 	$executionStartTime = microtime(true) / 1000;
 	$output = [];
 
+	$countryCodeUrl= 'http://api.geonames.org/countryCodeJSON?formatted=true&lat=' . $_REQUEST['lat'] .'&lng='.$_REQUEST['lng']. '&username=nolo23&style=full';
+
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_URL, $countryCodeUrl);
+
+	$countryCodeResponse=curl_exec($ch);
+
+	curl_close($ch);
+
+	$countryCodeResult = json_decode($countryCodeResponse,true);
+	$countryCode = $countryCodeResult['countryCode'];	
+
+	$output['countryCodeData'] = $countryCode; 
+
 	$countryInfoUrl='http://api.geonames.org/countryInfoJSON?formatted=true&country=' . $_REQUEST['country'] . '&username=nolo23&style=full';
 
 	$ch = curl_init();
@@ -14,13 +30,13 @@
 
 	curl_close($ch);
 
-	$countryInfoResult = json_decode($countryInfoResponse,true);	
+	$countryInfoResult = json_decode($countryInfoResponse,true);
+	
+	$countryName = $countryInfoResult['geonames']['0']['countryName'];
+	$countryName = str_replace(" ","%20", $countryName);	
+	$countryCode = $countryInfoResult['geonames']['0']['countryCode'];
 
-	$output['status']['code'] = "200";
-	$output['status']['name'] = "ok";
-	$output['status']['description'] = "mission saved";
-	$output['status']['returnedIn'] = (microtime(true) - $executionStartTime) / 1000 . " ms";
-	$output['countryInfoData'] = $countryInfoResult['geonames'];
+	$output['countryInfoData'] = [$countryInfoResult['geonames']['0']['areaInSqKm'], $countryInfoResult['geonames']['0']['capital'], $countryInfoResult['geonames']['0']['population'], $countryInfoResult['geonames']['0']['countryName']];
 	
 	header('Content-Type: application/json; charset=UTF-8');
 
@@ -37,30 +53,11 @@
 	curl_close($ch);
 
 	$restCountriesResult = json_decode($restCountriesResponse,true);
-	$restCountry = $restCountriesResult['restCountriesResult'];	
-	$output['restCountriesData'] = $restCountriesResult;
+	$restCountry = [$restCountriesResult['currencies'], $restCountriesResult['languages'], $restCountriesResult['flag'] ];	
+	$output['restCountriesData'] = $restCountry;
 
-	$countryCodeUrl= 'http://api.geonames.org/countryCodeJSON?formatted=true&lat=' . $_REQUEST['lat'] .'&lng='.$_REQUEST['lng']. '&username=nolo23&style=full';
 
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-	curl_setopt($ch, CURLOPT_URL, $countryCodeUrl);
-
-	$countryCodeResponse=curl_exec($ch);
-
-	curl_close($ch);
-
-	$countryCodeResult = json_decode($countryCodeResponse,true);
-	$countryCode = $countryCodeResult['countryCode'];	
-
-	//$output['status']['code'] = "200";
-	//$output['status']['name'] = "ok";
-	//$output['status']['description'] = "Country Code acquired";
-	//$output['status']['returnedIn'] = (microtime(true) - $executionStartTime) / 1000 . " ms";
-	$output['countryCodeData'] = $countryCodeResult;
-
-	$citiesUrl ='http://api.geonames.org/searchJSON?country='.$_REQUEST['countryCode'].'&maxRows=10&cities=cities1000&orderby=population&style=LONG&username=nolo23';
+	$citiesUrl ='http://api.geonames.org/searchJSON?country='.$countryCode.'&maxRows=10&cities=cities1000&orderby=population&style=LONG&username=nolo23';
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -71,38 +68,51 @@
 	curl_close($ch);
 
 	$cityCodeResult = json_decode($cityCodeResponse,true);
-	$cityCode = $cityCodeResult['cityCode'];	
-	$output['cityData'] = $cityCodeResult;
+	$cityCode = $cityCodeResult['geonames'];
 
-	$weatherUrl = 'api.openweathermap.org/data/2.5/weather?q='.$_REQUEST['city'].','.$_REQUEST['countryCode'].'&units=metric&appid=f23619a89b07343b833f164f8d7202a1';
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-	curl_setopt($ch, CURLOPT_URL, $weatherUrl);
+	$cities =[];
+	foreach ($cityCode as $city) {
 
-	$weatherResponse=curl_exec($ch);
+	$info['name'] = $city['name'];
+	$info['population']= $city['population'];
+	$info['lat']= $city['lat'];
+	$info['lng']= $city['lng'];
 
-	curl_close($ch);
+    array_push($cities, $info);  
 
-	$weatherResult = json_decode($weatherResponse,true);
-	$weatherCode = $weatherResult['weather'];	
-	$output['weatherData'] = $weatherResult;
+}
+	$output['cityData'] = $cities;
 
-	$emissionUrl = 'https://api.v2.emissions-api.org/api/v2/'.$_REQUEST['product'].'/statistics.json?country='.$_REQUEST['countryCode'].'&interval=year&begin='.$_REQUEST['startDate'].'&end='.$_REQUEST['endDate'].'&limit=1';
-	$ch = curl_init();
-	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-	curl_setopt($ch, CURLOPT_URL, $emissionUrl);
+    $weatherCities=[];
+	foreach ($cities as $city) {
 
-	$emissionCodeResponse=curl_exec($ch);
+		$weatherUrl = 'api.openweathermap.org/data/2.5/weather?q='.$city['name'].','.$countryCode.'&units=metric&appid=f23619a89b07343b833f164f8d7202a1';
+	    $ch = curl_init();
+	    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+	    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	    curl_setopt($ch, CURLOPT_URL, $weatherUrl);
 
-	curl_close($ch);
+	    $weatherResponse=curl_exec($ch);
 
-	$emissionCodeResult = json_decode($emissionCodeResponse,true);
-	$emissionCode = $emissionCodeResult['emissionCode'];	
-	$output['emissionData'] = $emissionCodeResult;
+	    curl_close($ch);
 
-	$covidUrl = 'https://covid19-api.com/country?name='.$_REQUEST['country'].'&format=json';
+		$weatherResult = json_decode($weatherResponse,true);
+		
+		$weatherforCity=[];
+		array_push($weatherforCity, $weatherResult['main'], $weatherResult['weather']);
+	
+		array_push($weatherCities, $weatherforCity);
+	
+	
+	}
+
+	$output['weatherData'] = $weatherCities;
+
+	
+	
+	
+
+	$covidUrl = 'https://covid19-api.com/country/code?code='.$_REQUEST['country'].'&format=json';
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -113,8 +123,8 @@
 	curl_close($ch);
 
 	$covidCodeResult = json_decode($covidCodeResponse,true);
-	$covidCode = $covidCodeResult['covidCode'];	
-	$output['covidData'] = $covidCodeResult;
+	$covidInfo = [$covidCodeResult[0]['confirmed'],$covidCodeResult[0]['critical'], $covidCodeResult[0]['deaths'], $covidCodeResult[0]['recovered'], $covidCodeResult[0]['lastUpdate']];	
+	$output['covidData'] = $covidInfo;
 
 	/*$currencyUrl = 'https://openexchangerates.org/api/latest.json?app_id=81f4aee418e4422cbf613de699dae46f';
 	$ch = curl_init();
@@ -127,11 +137,11 @@
 	curl_close($ch);
 
 	$currencyResult = json_decode($currencyResponse,true);
-	$currencyCode = $currencyResult['covidCode'];	
-	$output['currencyData'] = $currencyResult; */
+	$currencyCode = $currencyResult['rates'][$restCountriesResult['currencies'][0]['code']];	
+	$output['currencyData'] = $currencyCode; */
 
 	
-	$worldBankUrl = 'http://api.worldbank.org/v2/country/'.$_REQUEST['country'].'?format=json';
+	$worldBankUrl = 'http://api.worldbank.org/v2/country/'.$countryCode.'?format=json';
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -143,7 +153,34 @@
 
 	$worldBankResult = json_decode($worldBankResponse,true);
 	$worldBankCode = $worldBankResult['worldBank'];	
-	$output['worldBankData'] = $worldBankResult;
+	$output['worldBankData'] = $worldBankResult[1][0]['incomeLevel']['value'];
+
+	$emissionArray=[];
+
+    $products = ['methane', 'carbonmonoxide', 'ozone','nitrogendioxide'];
+
+    foreach($products as $product){
+        $emissionUrl = 'https://api.v2.emissions-api.org/api/v2/'.$product.'/statistics.json?country='.$_REQUEST['country'].'&interval=year&begin='.$_REQUEST['startDate'].'&end='.$_REQUEST['endDate'].'&limit=1';
+	    $ch = curl_init();
+	    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+	    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	    curl_setopt($ch, CURLOPT_URL, $emissionUrl);
+
+	   $emissionResponse=curl_exec($ch);
+
+	    curl_close($ch);
+
+	   $emissionResult = json_decode($emissionResponse,true);
+	   $emission= $emissionResult[0]['value']['average'];
+       array_push($emissionArray,$emission);
+
+	}
+	$output['emissionData'] = $emissionArray;
+
+	$output['status']['code'] = "200";
+	$output['status']['name'] = "ok";
+	$output['status']['description'] = "mission saved";
+	$output['status']['returnedIn'] = (microtime(true) - $executionStartTime) / 1000 . " ms";
 
 
 	header('Content-Type: application/json; charset=UTF-8');

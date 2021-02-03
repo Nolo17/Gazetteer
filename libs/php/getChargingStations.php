@@ -2,7 +2,7 @@
 
     $executionStartTime = microtime(true) / 1000;
 
-    $electricUrl='https://api.openchargemap.io/v3/poi/?output=json&countrycode='.$_REQUEST['countryCode'].'&compact=true&verbose=false';
+    $electricUrl='https://api.openchargemap.io/v3/poi/?output=json&countrycode='.$_REQUEST['countryCode'].'&compact=true&verbose=false&maxresults=1000000&key=222e5607-4bd5-4040-98a5-ab6077cf684f';
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

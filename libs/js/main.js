@@ -2,6 +2,30 @@
 const geoJsonData = "libs/geoJson/countryBorders.geo.json"
 let countryDropdown = $('#countryDropdown');
 
+//variables for general Info
+let countryInfo=[];
+let countryName= '';
+let lang = '';
+let flag = '';
+
+//variables for economic Info
+let incomeLevel= '';
+let economicData=[];
+let currencyExchange='';
+
+//variables for Covid Info
+let CovidData =[];
+
+//variables for biggest cities
+let cities=[];
+
+//weatherVariable
+let weatherInfo=[];
+
+//emission Variable
+let emissions=[];
+
+
 var streetMapUrl ='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
     streetMapAttrib = 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
     satMapUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
@@ -55,53 +79,38 @@ L.control.layers(baseLayers, overlayMaps).addTo(mymap);
 
 function main(){
 
+$('#loadingEl').show();
 
+getCountrySelect();
 
-$('#loadingImg').show();
-countryDropdown.empty();
-
-countryDropdown.append('<option selected="true" disabled>Select Country</option>');
-countryDropdown.prop('selectedIndex', 0);
-
-$.getJSON(geoJsonData, function (countries) {
-   $.each(countries.features, function (key, entry) {
-      countryDropdown.append($('<option></option>').attr('value', entry.properties.ISO_A2).text(entry.properties.ADMIN));
-  }) 
-
-}); 
-
-//if (!('hasCodeRunBefore' in localStorage)){
-  getLocation();
-//  localStorage.setItem("hasCodeRunBefore", true);
-//};
+getLocation();
 
 // Injecting info button into HTML
 
 L.easyButton( '<i class="fas fa-info-circle"></i>', function(){
-  getCountryInformation();
-}).addTo(mymap);
+  displayCountryInfo();
+}
+).addTo(mymap); 
 
 L.easyButton( 'fa-usd', function(){
-  getEconomicInformation();  
-}).addTo(mymap);
+  displayEconomicInfo()
+}).addTo(mymap); 
 
 L.easyButton( 'fa-city', function(){
-  getCities();
-  //getWeather();
-  console.log(getCities());
+  displayCityMarkers();
+  
 }).addTo(mymap);
 
 L.easyButton( '<i class="fas fa-cloud-sun"></i>', function(){
-  getWeatherrr();
-  //displayNames();
+  displayCityInformation();
 }).addTo(mymap);
 
 L.easyButton( '<i class="fas fa-virus"></i>', function(){
-  getCovidInformation();
-}).addTo(mymap);
+  displayCovidData();
+}).addTo(mymap); 
 
 L.easyButton('<i class="fas fa-smog"></i>', function(){
-  getEmissions();
+  displayEmissionInfo();
 }).addTo(mymap);
 
 L.easyButton('<i class="fas fa-charging-station"></i>', function(){
@@ -109,37 +118,57 @@ L.easyButton('<i class="fas fa-charging-station"></i>', function(){
 }).addTo(mymap);
 
 
-
 $('#countrySelectButton').click(function(e){
   e.preventDefault();
-  getCountryBorders();
+  getData();
 
 });
-countryDropdown.change(function () {
-  getCountryBorders();
+countryDropdown.change(function() {
+  getData(); 
 });
-$('#loadingImg').hide();
 
+$('#loadingEl').hide();
 };
+
+//  get country select menu
+function getCountrySelect()  {
+  $.ajax({
+    url: "libs/php/getCountryBorders.php",
+    type: 'POST',
+    dataType: 'json',
+    success: function(result) {
+      if (result.status.name == "ok") {
+        countryDropdown.html('');
+        $.each(result.data, function(index) {
+            countryDropdown.append($("<option>", {
+                value: result.data[index].code,
+        
+                text: result.data[index].name
+            }));  
+        
+        }); 
+      }
+    
+    },
+    error: function(jqXHR, textStatus, errorThrown) {
+      console.log(jqXHR + textStatus +  errorThrown)
+    }
+  }); 
+}
 
 
 // get initial location
-
-function getLocation() {
-  
+ function getLocation() {
    if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(showPosition);
-    
-    
+     navigator.geolocation.getCurrentPosition(showPosition);  
  } else {
-   alert ("Geolocation not possible.");
+   alert ("Geolocation not possible."); 
  } 
-  
 }
 
-function showPosition(position) {
+ function showPosition(position) {
     $.ajax({
-    url: "libs/php/getCountry.php",
+    url: "libs/php/getCountryCode.php",
     type: 'POST',
     dataType: 'json',
     data: {
@@ -147,528 +176,243 @@ function showPosition(position) {
       lng: position.coords.longitude
     },
     success: function(result) {
-      
-
-      // Creating current Location icon
     
-      var currentLocOption = L.icon({
-        iconUrl: "./libs/img/currentLoc.png",
-        iconSize: [22, 31],
-        iconAnchor: [9, 21],
-        popupAnchor: [0, -14]
-      });
-
-      const currentLocIcon ={icon: currentLocOption};
-
-      const countryCode = result['countryCodeData']['countryCode'];
-      console.log(result['countryCodeData']);
+      const countryCode = result['countryCodeData'];
       
       if (result.status.name == "ok") {
         $('#countryDropdown').val(countryCode);
-         var positionMarker = new L.Marker([position.coords.latitude, position.coords.longitude], currentLocIcon);
+        var positionMarkerOps = L.ExtraMarkers.icon({
+          icon: 'fa-location-arrow',
+          markerColor: 'yellow',
+          shape: 'circle',
+          prefix: 'fa'
+        });
+        
+        let positionMarker = L.marker([position.coords.latitude, position.coords.longitude], {icon: positionMarkerOps}).addTo(mymap);
             positionMarker.bindPopup('You are here').addTo(mymap); 
-            
-        return getCountryBorders();
+            getData();
       } 
     
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
     } 
-  }); 
-  
+  });  
 };
 
-function getCountryBorders() {
-  $.getJSON(geoJsonData, function(countries){
-    // L.geoJson function is used to parse geojson file and load on to map
-    let currentCountry =  $('#countryDropdown option:selected').text();
-    var geoJsonLayer= L.geoJson(countries, {filter: getCurrentCountry, color:'#c1cd32'}).addTo(mymap);
-      function getCurrentCountry(feature) {
-      //let currentCountry =  $('#countryDropdown option:selected').text();
-      console.log(currentCountry);
-      if (feature.properties.ADMIN === currentCountry) return true
-    }
+// get Country borders from geoJson file
+ function getCountryBorders(country)  {
+  $.ajax({
+    url: "libs/php/getCountryBorders.php",
+    type: 'POST',
+    dataType: 'json',
+    data: {
+      countryName: country
+    },
+    success: function(result) {
+      if (result.status.name == "ok") {
+      let borders= result.borders;
+    var geoJsonLayer= L.geoJson(borders, {color:'#c1cd32'}).addTo(mymap);
     mymap.fitBounds(geoJsonLayer.getBounds());
     
     (countryDropdown.change(function(){
       if (geoJsonLayer){
         geoJsonLayer.remove(mymap)
       };
-      geoJsonLayer= L.geoJson(countries, {filter: getCurrentCountry, stroke: false, color:'#151305', opacity:0.01}).addTo(mymap);
-
+      geoJsonLayer= L.geoJson(borders, {stroke: false, color:'#151305', opacity:0.01}).addTo(mymap);
     })
     ); 
-} )};
-
-// get general info on country 
-function getCountryInformation()  {
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    dataType: 'json',
-    data: {
-        country: $('#countryDropdown').val()
-      },
-    success: function(result) {
-
-      console.log(result);
-
-      if (result.status.name == "ok") {
-
-        let countryName =result['countryInfoData'][0]['countryName'];
-        wikiLink = "https://en.wikipedia.org/wiki/"+countryName;
-        console.log(wikiLink);
-        $('#modalTitle').html(countryName);
-        $('#info1').html("Capital: "+ result['countryInfoData'][0]['capital']);
-        $('#info3').html("Population: "+ result['countryInfoData'][0]['population']);
-        $('#info4').html("Area in km<sup>2</sup>: "+ result['countryInfoData'][0]['areaInSqKm']);
-        var wikiHTML = $('<a target="_blank" href='+wikiLink +'></a>').text("Read more on Wikipedia");
-        $("#modal-body").append(wikiHTML);
-        $('#myModal').modal('toggle');
-
-      }
-    
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
-    }
-  }); 
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    dataType: 'json',
-    data: {
-        country: $('#countryDropdown').val()
-      },
-    success: function(result) {
-
-      console.log(result);
-
-      if (result.status.name == "ok") {
-        const languageArr = result['restCountriesData']['languages']
-        const countryFlag= result['restCountriesData']['flag']
-        let languages='';
-        for (let i=0; i <languageArr.length; i++){
-          languages+= languageArr[i]['name']+'/ '+languageArr[i]['nativeName']+'<br>'
-        }
-
-        $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+countryFlag+'>')
-        $('#info2').html("Language: "+ languages);
-      }
-    
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
-    }
-  }); 
-};
-
-function getCities(){
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    dataType: 'json',
-    data: {
-        countryCode: $('#countryDropdown').val()
-      },
-    success: function(result) {
-
-      if (result.status.name == "ok") {
-
-        console.log(result['cityData']);
-    
-       let locations = [
-          [result['cityData']['geonames'][0]['name'], result['cityData']['geonames'][0]['lat'], result['cityData']['geonames'][0]['lng']],
-          [result['cityData']['geonames'][1]['name'], result['cityData']['geonames'][1]['lat'], result['cityData']['geonames'][1]['lng']],
-          [result['cityData']['geonames'][2]['name'], result['cityData']['geonames'][2]['lat'], result['cityData']['geonames'][2]['lng']],
-          [result['cityData']['geonames'][3]['name'], result['cityData']['geonames'][3]['lat'], result['cityData']['geonames'][3]['lng']],
-          [result['cityData']['geonames'][4]['name'], result['cityData']['geonames'][4]['lat'], result['cityData']['geonames'][4]['lng']],
-          [result['cityData']['geonames'][5]['name'], result['cityData']['geonames'][5]['lat'], result['cityData']['geonames'][5]['lng']],
-          [result['cityData']['geonames'][6]['name'], result['cityData']['geonames'][6]['lat'], result['cityData']['geonames'][6]['lng']],
-          [result['cityData']['geonames'][7]['name'], result['cityData']['geonames'][7]['lat'], result['cityData']['geonames'][7]['lng']],  
-        ];
-
-        // Icon options
-        var locationOptions = {
-               iconUrl: "./libs/img/citylocation.png",
-               iconSize: [22, 31]
-                  }
-
-        // Creating city icon
-           var citylocIcon = L.icon(locationOptions);
-           var citylocOptions ={icon: citylocIcon};
-
-        for (var i = 0; i < 8; i++) {
-          marker = new L.Marker([locations[i][1], locations[i][2]], citylocOptions)
-            .bindPopup(locations[i][0])
-            .addTo(mymap);
-        };
-        console.log(locations);
-
-        for (let i=0; i< 8; i++){
-          $.ajax({
-          url: "libs/php/getCountry.php",
-          type: 'POST',
-          dataType: 'json',
-          data: {
-              city: locations[0][0]
-            },
-          success: function(result) {
-      
-            if (result.status.name == "ok") {
-              console.log(result['weatherData']);
-              let markup = "<table><tr><th>"+result['name']+"</th><th>"+result['main']['temp']+"</th><tr></table";
-              
-              $('#modal-body').html(markup);
-              $('#myModal').modal('toggle');
-    
-      
-            }
-          
-          },
-          error: function(jqXHR, textStatus, errorThrown) {
-            console.log(jqXHR + textStatus +  errorThrown)
-          }
-        });
-      };
-      }
-    
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
-    }
-  });   
-};
-
-async function getCityNames() {
-  let result;
-  try {
-      result = await $.ajax({
-          url: "libs/php/getCountry.php",
-          type: 'POST',
-          data: {
-            countryCode: $('#countryDropdown').val()
-          }
-      });
-      return result['cityData']['geonames'];
-  } catch (error) {
-      console.error(error);
-  }
-};
-
-async function displayNames(){
-  let cityNames = await getCityNames();
-  console.log(cityNames);
-  let weatherDataArr=[];
-  const weatherLoop = async _ => {
-    console.log('Start')
-    for (let i=0; i < cityNames.length; i++){
-      $.ajax({
-      url: "libs/php/getCountry.php",
-      type: 'POST',
-      dataType: 'json',
-      data: {
-          city: cityNames[i]['name'],
-          countryCode:  $('#countryDropdown').val()
-        },
-      success: function(result) {
-  
-        if (result.status.name == "ok") {
-          //console.log(result['weatherData']);
-          let weatherinfo= [result['weatherData']['name'], [result['weatherData']['main']['temp']]];
-          weatherDataArr.push(weatherinfo);
-          //console.log(weatherDataArr);
-        }
-      
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log(jqXHR + textStatus +  errorThrown)
-      }  
-    });  
-  }
-  
-    console.log('End')
-    return weatherDataArr;
-  }
-  const weatherInfo = await weatherLoop();
-console.log(weatherInfo);
-return weatherInfo;
-};
-
-async function getWeatherrr(){
-  let weatherInfo = await displayNames();
-  console.log(weatherInfo);
-  console.log(weatherInfo[0]);
-  let countryName =$('#countryDropdown option:selected').text();
-        $('#modalTitle').html('Weather Information for: '+countryName);
-        //$('#info1').html(weatherInfo[7][0]+weatherInfo[7][1]);
-        $('#myModal').modal('toggle');
-  /*for (let i=0; i< 8; i++){
-        //$('#modal-body').append('<table>');
-        $('#modal-body').html(weatherDataArr[0][0]+weatherDataArr[1]);
-        let markup = "<table><tr><th>"+weatherInfo[0][0]+"</th><th>"+result['main']['temp']+"</th><tr></table";
-        //$('#modal-body').append('</table>');
-        $('#myModal').modal('toggle');
-
-  
-
-} */
-};
-
-
-/*function getWeather(){
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    dataType: 'json',
-    data: {
-        countryCode: $('#countryDropdown').val()
-      },
-    success: function(result) {
-
-      if (result.status.name == "ok") {
-
-        console.log(result);
-        let citylocations = [];
-
-        for(let i=0; i<8; i++){
-          citylocations.push(result['cityData']['geonames'][i]['name']);
-        }
-        console.log(citylocations);
-
-        let weatherDataArr=[];
-        let weatherTable ='';
-    
-        for (let i=0; i< 8; i++){
-          $.ajax({
-          url: "libs/php/getCountry.php",
-          type: 'POST',
-          dataType: 'json',
-          data: {
-              city: citylocations[i],
-              countryCode:  $('#countryDropdown').val()
-            },
-          success: function(result) {
-      
-            if (result.status.name == "ok") {
-              console.log(result['weatherData']);
-              let weatherinfo= [result['weatherData']['name'], [result['weatherData']['main']['temp']]];
-              weatherDataArr.push(weatherinfo);
-              weatherTable +=  "<tr><th>"+result['weatherData']['name']+"</th><th>"+result['weatherData']['main']['temp']+"</th><tr>";
-            }
-          
-          },
-          error: function(jqXHR, textStatus, errorThrown) {
-            console.log(jqXHR + textStatus +  errorThrown)
-          }  
-        });
-        
-      };
-      console.log(weatherDataArr);
-        //console.log(weatherTable);
-      console.log(weatherDataArr[0][0]);
-        //console.log(weatherTable);
-        let countryName =$('#countryDropdown option:selected').text();
-        $('#modalTitle').html('Weather Information for: '+countryName);
-        //$('#modal-body').append('<table>');
-        $('#modal-body').html(weatherDataArr[0]+weatherDataArr[1]);
-        //$('#modal-body').append('</table>');
-        $('#myModal').modal('toggle');  
-      }
-    
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
-    }
-        
-  });  
-  
-
-};*/
-
-// get Info on economy and currency
-function getEconomicInformation()  {
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    data: {
-      country: $('#countryDropdown').val()
-    },
-    dataType: 'json',
-    success: function(result) {
-
-      if (result.status.name == "ok") {
-        let countryName= result['restCountriesData']['name'];
-        let countryFlag= result['restCountriesData']['flag'];
-        let currencyCode = result['restCountriesData']['currencies'][0]['code'];
-        let currencyRate =result['currencyData']['rates'][currencyCode];
-        let currencyName = result['restCountriesData']['currencies'][0]['name'];
-        let currencySymbol = result['restCountriesData']['currencies'][0]['symbol'];
-        
-        console.log(currencyCode);
-        console.log(result);
-        
-        $('#modalTitle').html('Economic Information in '+ countryName);
-        $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+countryFlag+'>')
-        $('#info1').html("Income Level: "+ result['worldBankData'][1][0]['incomeLevel']['value']);
-        $('#info2').html("Currency Name: "+ currencyName);
-        $('#info3').html("Exchange Rate: 1USD =  "+ currencyRate+ currencySymbol);
-        $('#myModal').modal('toggle')
-        $.get('https://openexchangerates.org/api/latest.json', {app_id: '81f4aee418e4422cbf613de699dae46f'}, function(data) {
-    console.log("1 US Dollar equals " + data.rates.EUR+ " eur"); 
-});
-
-
-      }
-    
+      } 
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
     }
   }); 
 }
-  
-  
- // get Numbers on Emissions of a country
-function getEmissions(){
+
+
+function getData(){
+  $('#loadingEl').show();
   const d = new Date();
   const startdate = (d.getFullYear()-1)+'-'+(d.getMonth()+1)+'-'+d.getDate(); 
-  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()
   $.ajax({
     url: "libs/php/getCountry.php",
     type: 'POST',
     dataType: 'json',
     data: {
-        product: 'methane',
-        countryCode: $('#countryDropdown').val(),
+        country: $('#countryDropdown').val(),
         startDate: startdate,
         endDate: enddate
       },
     success: function(result) {
 
       if (result.status.name == "ok") {
-        let emissionAverage =(result['emissionData'][0]['value']['average']).toFixed(5);
-        $('#modalTitle').html('Emissions (daily average in the last year)')
-        $('#info1').html("Methane: "+ emissionAverage+" mol/m<sup>2</sup>");
-        $('#myModal').modal('toggle');
-
-
+        countryInfo=result['countryInfoData'];
+        countryName= result['countryInfoData'][3]; 
+        lang = result['restCountriesData'][1];
+        flag = result['restCountriesData'][2];
+        incomeLevel= result['worldBankData'];
+        economicData=result['restCountriesData'][0][0];
+        currencyExchange=result['currencyData']|| 'N/A';
+        cities = result ['cityData'];
+        weatherInfo= result['weatherData'];
+        covidData=result['covidData']
+        emissions=result['emissionData'];
+        let country= countryName;
+        getCountryBorders(country);       
       }
     
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
     }
-  }); 
-$.ajax({
-  url: "libs/php/getCountry.php",
-  type: 'POST',
-  dataType: 'json',
-  data: {
-      product: 'carbonmonoxide',
-      countryCode: $('#countryDropdown').val(),
-      startDate: startdate,
-      endDate: enddate
-    },
-  success: function(result) {
+  });
+  $('#loadingEl').hide(); 
+}
 
-    if (result.status.name == "ok") {
-      let emissionAverage =(result['emissionData'][0]['value']['average']).toFixed(5);
-      $('#info2').html("Carbonmonoxide: "+ emissionAverage+" mol/m<sup>2</sup>");
-    }
+function displayCountryInfo(){
+        let capital = countryInfo[1];
+        let population= countryInfo[2];
+        let size = countryInfo[0];
+        let languages=''; 
+        for (let i=0; i <lang.length; i++){
+          languages+= lang[i]['name']+'/ '+lang[i]['nativeName']+'<br>'
+        }
+        let wikiLinkName = countryName.replace(' ','_');
+        wikiLink = "https://en.wikipedia.org/wiki/"+wikiLinkName;
+        let countryInfoContent = `<table class="table table-hover">
+        <tr><td>Capital: </td><td> ${capital}</td></tr> 
+        <tr><td>Languages:</td><td> ${languages}</td></tr>
+         <tr><td>Population: </td><td>${population}</td></tr>
+         <tr><td>Size in km<sup>2</sup>:</td><td> ${size}</td></tr>
+         </table>
+         <a href=${wikiLink} target="_blank">Read more on Wikipedia</a>`;
+        $('#modalTitle').html(countryName);
+        $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+flag+'>');
+        $('#modal-body').empty();
+        $("#modal-body").append(countryInfoContent); 
+        $('#myModal').modal('toggle');
+}
+
+ function displayEconomicInfo(){
+  let currencyName= economicData['name'];
+  let currencyRate= currencyExchange;
+  let currencySymbol= economicData['symbol'];
+  let economicInfoContent = `<table class="table table-hover"><tr><td>Income Level:</td><td>${incomeLevel}</td></tr> 
+  <tr><td>Currency Name: </td><td>${currencyName}</td></tr> 
+  <tr><td>Exchange Rate: </td><td>1USD = ${currencyRate}${currencySymbol}</td></tr>
+  </table>`;
   
-  },
-  error: function(jqXHR, textStatus, errorThrown) {
-    console.log(jqXHR + textStatus +  errorThrown)
-  }
-});
-$.ajax({
-  url: "libs/php/getCountry.php",
-  type: 'POST',
-  dataType: 'json',
-  data: {
-      product: 'ozone',
-      countryCode: $('#countryDropdown').val(),
-      startDate: startdate,
-      endDate: enddate
-    },
-  success: function(result) {
+  $('#modalTitle').html('Economic Information for '+ countryName);
+  $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+flag+'>');
+  $('#modal-body').empty();
+  $("#modal-body").append(economicInfoContent); 
+  $('#myModal').modal('toggle');       
+ }
 
-    if (result.status.name == "ok") {
-      console.log(result);
-      let emissionAverage =(result['emissionData'][0]['value']['average']).toFixed(5);
-      $('#info3').html("Ozone: "+ emissionAverage+" mol/m<sup>2</sup>");
-    }
-  
-  },
-  error: function(jqXHR, textStatus, errorThrown) {
-    console.log(jqXHR + textStatus +  errorThrown)
-  }
-});
-$.ajax({
-  url: "libs/php/getCountry.php",
-  type: 'POST',
-  dataType: 'json',
-  data: {
-      product: 'nitrogendioxide',
-      countryCode: $('#countryDropdown').val(),
-      startDate: startdate,
-      endDate: enddate
-    },
-  success: function(result) {
+ function displayCityMarkers(){
 
-    if (result.status.name == "ok") {
-      let emissionAverage =(result['emissionData'][0]['value']['average']).toFixed(5);
-      $('#info4').html("Nitrogendioxide: "+ emissionAverage +" mol/m<sup>2</sup>");
-    }
-  
-  },
-  error: function(jqXHR, textStatus, errorThrown) {
-    console.log(jqXHR + textStatus +  errorThrown)
-  }
-});
+  // Creating city icon
+  var cityMarkerOps = L.ExtraMarkers.icon({
+    icon: 'fa-circle-o',
+    markerColor: 'orange',
+    shape: 'circle',
+    prefix: 'fa'
+  });
+let cityMarkers=[];
+for (var i = 0; i < cities.length; i++) {
+   let weatherIcon=weatherInfo[i][1][0]['icon'] ;
+    let weatherIconLink='http://openweathermap.org/img/wn/'+weatherIcon+'@2x.png';
+    let temp= (weatherInfo[i][0]['temp']).toFixed(1);
+    let popup = L.popup()
+    .setContent(`<h6>${cities[i]['name']}</h6> 
+    <img src=${weatherIconLink} alt='weatherIcon' class='weatherPopup'> 
+    <p class='tempPopup'>${temp}&deg;C</p>`);
 
-};
+    let cityMarker = L.marker([cities[i]['lat'], cities[i]['lng']], {icon: cityMarkerOps});
+   //var positionMarker = new L.Marker([position.coords.latitude, position.coords.longitude], currentLocIcon);
+      cityMarker.bindPopup(popup);
+      cityMarkers.push(cityMarker);
+    };
+    let cityLayerGroup = L.layerGroup(cityMarkers);
+    mymap.addLayer(cityLayerGroup)
+    countryDropdown.change(function(){
+    mymap.removeLayer(cityLayerGroup);
+}); 
+ }
 
-// get Covid-19 Data 
-function getCovidInformation()  {
-  $.ajax({
-    url: "libs/php/getCountry.php",
-    type: 'POST',
-    dataType: 'json',
-    data: {
-        country: $('#countryDropdown option:selected').text()
-      },
-    success: function(result) {
+ function displayCityInformation(){
+   let cityTableContent = `<table class='table table-hover'>
+   <thead><tr>
+   <td>city</td>
+   <td>size</td>
+   <td>conditions</td>
+   <td>temp</td>
+   <td>feels like</td>
+   </tr></thead>`;
 
-      console.log(result);
+   for (let i= 0; i< cities.length; i++){
+    let weatherIcon=weatherInfo[i][1][0]['icon'] ;
+    let weatherIconLink='http://openweathermap.org/img/wn/'+weatherIcon+'@2x.png';
+    let temp= (weatherInfo[i][0]['temp']).toFixed(1);
+    let feelsLike= (weatherInfo[i][0]['feels_like']).toFixed(1);
+    cityTableContent += 
+    `<tr><td>${cities[i]['name']}</td>
+    <td>${cities[i]['population']}</td>
+    <td><img class='weatherIcon' src=${weatherIconLink} alt='weather Icon'></td>
+    <td>${temp}</td>
+    <td>${feelsLike}</td></tr>`;
+   }
+   cityTableContent +="</table>"
+   
+  $('#modalTitle').html('Cities in '+ countryName);
+  $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+flag+'>');
+  $('#modal-body').empty();
+  $("#modal-body").append(cityTableContent); 
+  $('#myModal').modal('toggle');  
+ }
 
-      if (result.status.name == "ok") {
-        console.log(result)
-        $('modal-body').html('');
-        let $table = $('<table>');
-        $table.append( '<tr><td>' + 'Confirmed Cases: ' +  result['covidData'][0]['confirmed'] + '</td></tr>' );
-        $table.append( '<tr><td>' + 'Critical Cases: ' +  result['covidData'][0]['critical'] + '</td></tr>' );
-        $table.append( '<tr><td>' + 'Deaths: ' +  result['covidData'][0]['deaths'] + '</td></tr>' );
-        $table.append( '<tr><td>' + 'Recovered: ' +  result['covidData'][0]['recovered'] + '</td></tr>' );
-        $table.append( '<tr><td>' + 'Last Update: ' +  result['covidData'][0]['lastUpdate'] + '</td></tr>' );
-        $table.append('</table>')
+ function displayCovidData(){
+    let confirmed = covidData[0];
+    let critical = covidData[1];
+    let deaths = covidData[2];
+    let recovered= covidData[3];
+    let update =covidData[4]; 
+    let covidInfoContent = `<table class='table table-hover'>
+        <tr><td>Confirmed Cases:   </td><td>${confirmed}</td></tr> 
+        <tr><td>Critical Cases: </td><td>${critical}</td></tr> 
+        <tr><td>Deaths: </td><td>${deaths}</td></tr> 
+        <tr><td>Recovered: </td><td>${recovered}</td></tr> 
+        <tr><td>Last Update: </td><td>${update}</td></tr> 
+        </table>`;
+    
+        $('#modalTitle').html('Covid-19 Data for '+ countryName)
+        $('#modal-body').empty();
+        $("#modal-body").append(covidInfoContent); 
+        $('#myModal').modal('toggle');    
+ }
 
-        $('#modalTitle').html('Covid-19 Data for '+ $('#countryDropdown option:selected').text());
-        $('#infoDiv').html($table); //$('#modal-body').html()
+ function displayEmissionInfo(){
+   let methane= (Math.round(emissions[0]*100000))/100000;
+   let carbonmonoxide= (Math.round(emissions[1]*100000))/100000;
+   let ozone= (Math.round(emissions[2]*100000))/100000;;
+   let nitrogendioxide= (Math.round(emissions[3]*1000000))/1000000;
+      let emissionInfoContent = `<table class="table table-hover">
+        <tr><td>Methane: </td><td>${methane}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Carbonmonoxide: </td><td>${carbonmonoxide}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Ozone: </td><td>${ozone}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Nitrogendioxide: </td><td>${nitrogendioxide}mol/m<sup>2</sup></td></tr>
+        </table>`;
+    
+        $('#modalTitle').html('Emissions (daily average in the last year) in '+ countryName)
+        $('#modal-body').empty();
+        $("#modal-body").append(emissionInfoContent); 
         $('#myModal').modal('toggle');
 
-      }
-    
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
-    }
-  }); 
-};
+ }
 
-// get Charging Points for electric cars
+ // get Charging Points for electric cars
 function getChargingPoints()  {
   $.ajax({
     url: "libs/php/getChargingStations.php",
@@ -679,51 +423,39 @@ function getChargingPoints()  {
       },
     success: function(result) {
 
-      const elecMarkerOption = L.icon({
-        iconUrl: "./libs/img/elecLoc.png",
-        iconSize: [22, 31],
-        iconAnchor: [9, 21],
-        popupAnchor: [0, -14]
+      // Creating electric icon
+      var elecMarkerOps = L.ExtraMarkers.icon({
+        icon: 'fa-bolt',
+        markerColor: 'green',
+        shape: 'circle',
+        prefix: 'fa'
       });
-
-      const electricIcon ={icon: elecMarkerOption};
-
-      console.log(result);
-      console.log($('#countryDropdown').val());
+      
       let elecStationsArr = result['electricData'];
       var markers = new L.MarkerClusterGroup();
 
       for (var i = 0; i < elecStationsArr.length; i++) {
           let elecStation = elecStationsArr[i]['AddressInfo'];
           let title = elecStation['Title'];
-          console.log(elecStation['Latitude']);
-           var marker = L.marker([elecStation['Latitude'], elecStation['Longitude']], electricIcon);
+           let marker = L.marker([elecStation['Latitude'], elecStation['Longitude']], {icon: elecMarkerOps})
             marker.bindPopup(title);
             markers.addLayer(marker);
-           //{
-             // icon: L.mapbox.marker.icon({'marker-symbol': 'post', 'marker-color': '0044FF'}),
-             /* title: title
-              .bindPopup(title)
-              .addTo(mymap) */
-          //});
-          //marker.bindPopup(title);
-          //markers.addLayer(marker);
       };
       mymap.addLayer(markers);
-
-      
-  
-      //mymap.addLayer(markers);
-
-    
-    
+      countryDropdown.change(function(){
+        if (markers){
+          mymap.removeLayer(markers);
+        }
+      });  
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
     }
-  }); 
+  });  
 };
 
 $(document).ready(() => {
   main();
 });
+
+
