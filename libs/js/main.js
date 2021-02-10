@@ -1,10 +1,10 @@
 //var mymap = L.map('mapid').setView([51.505, -0.09], 13);
-const geoJsonData = "libs/geoJson/countryBorders.geo.json"
 let countryDropdown = $('#countryDropdown');
 
 //variables for general Info
 let countryInfo=[];
-let countryName= '';
+let countryIso2 ='';
+let countryName='';
 let lang = '';
 let flag = '';
 
@@ -97,12 +97,11 @@ L.easyButton( 'fa-usd', function(){
 }).addTo(mymap); 
 
 L.easyButton( 'fa-city', function(){
-  displayCityMarkers();
-  
+  displayCityMarkers(); 
 }).addTo(mymap);
 
 L.easyButton( '<i class="fas fa-cloud-sun"></i>', function(){
-  displayCityInformation();
+  displayWeatherInformation();
 }).addTo(mymap);
 
 L.easyButton( '<i class="fas fa-virus"></i>', function(){
@@ -117,14 +116,8 @@ L.easyButton('<i class="fas fa-charging-station"></i>', function(){
   getChargingPoints();
 }).addTo(mymap);
 
-
-$('#countrySelectButton').click(function(e){
-  e.preventDefault();
-  getData();
-
-});
 countryDropdown.change(function() {
-  getData(); 
+  getData(countryDropdown.val()); 
 });
 
 $('#loadingEl').hide();
@@ -177,9 +170,10 @@ function getCountrySelect()  {
     },
     success: function(result) {
     
-      const countryCode = result['countryCodeData'];
       
       if (result.status.name == "ok") {
+        let countryCode = result['countryCodeData'];
+        console.log(countryCode);
         $('#countryDropdown').val(countryCode);
         var positionMarkerOps = L.ExtraMarkers.icon({
           icon: 'fa-location-arrow',
@@ -190,7 +184,8 @@ function getCountrySelect()  {
         
         let positionMarker = L.marker([position.coords.latitude, position.coords.longitude], {icon: positionMarkerOps}).addTo(mymap);
             positionMarker.bindPopup('You are here').addTo(mymap); 
-            getData();
+            
+            getData(countryCode);
       } 
     
     },
@@ -231,23 +226,23 @@ function getCountrySelect()  {
 }
 
 
-function getData(){
-  $('#loadingEl').show();
+function getData(countryCode){
   const d = new Date();
   const startdate = (d.getFullYear()-1)+'-'+(d.getMonth()+1)+'-'+d.getDate(); 
-  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()
+  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
   $.ajax({
     url: "libs/php/getCountry.php",
     type: 'POST',
     dataType: 'json',
     data: {
-        country: $('#countryDropdown').val(),
+        country: countryCode,
         startDate: startdate,
         endDate: enddate
       },
     success: function(result) {
 
       if (result.status.name == "ok") {
+        console.log(result);
         countryInfo=result['countryInfoData'];
         countryName= result['countryInfoData'][3]; 
         lang = result['restCountriesData'][1];
@@ -268,13 +263,15 @@ function getData(){
       console.log(jqXHR + textStatus +  errorThrown)
     }
   });
-  $('#loadingEl').hide(); 
 }
 
 function displayCountryInfo(){
+  function formatNumber(num) {
+    return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+  }
         let capital = countryInfo[1];
-        let population= countryInfo[2];
-        let size = countryInfo[0];
+        let population= formatNumber(countryInfo[2]);
+        let size = formatNumber(countryInfo[0]);
         let languages=''; 
         for (let i=0; i <lang.length; i++){
           languages+= lang[i]['name']+'/ '+lang[i]['nativeName']+'<br>'
@@ -282,10 +279,10 @@ function displayCountryInfo(){
         let wikiLinkName = countryName.replace(' ','_');
         wikiLink = "https://en.wikipedia.org/wiki/"+wikiLinkName;
         let countryInfoContent = `<table class="table table-hover">
-        <tr><td>Capital: </td><td> ${capital}</td></tr> 
-        <tr><td>Languages:</td><td> ${languages}</td></tr>
-         <tr><td>Population: </td><td>${population}</td></tr>
-         <tr><td>Size in km<sup>2</sup>:</td><td> ${size}</td></tr>
+        <tr><td>Capital </td><td> ${capital}</td></tr> 
+        <tr><td>Languages</td><td> ${languages}</td></tr>
+         <tr><td>Population </td><td>${population}</td></tr>
+         <tr><td>Size in km<sup>2</sup></td><td> ${size}</td></tr>
          </table>
          <a href=${wikiLink} target="_blank">Read more on Wikipedia</a>`;
         $('#modalTitle').html(countryName);
@@ -297,11 +294,11 @@ function displayCountryInfo(){
 
  function displayEconomicInfo(){
   let currencyName= economicData['name'];
-  let currencyRate= currencyExchange;
+  let currencyRate= (Math.round(currencyExchange*100))/100;
   let currencySymbol= economicData['symbol'];
-  let economicInfoContent = `<table class="table table-hover"><tr><td>Income Level:</td><td>${incomeLevel}</td></tr> 
-  <tr><td>Currency Name: </td><td>${currencyName}</td></tr> 
-  <tr><td>Exchange Rate: </td><td>1USD = ${currencyRate}${currencySymbol}</td></tr>
+  let economicInfoContent = `<table class="table table-hover"><tr><td>Income Level</td><td>${incomeLevel}</td></tr> 
+  <tr><td>Currency Name </td><td>${currencyName}</td></tr> 
+  <tr><td>Exchange Rate </td><td>1USD = ${currencyRate}${currencySymbol}</td></tr>
   </table>`;
   
   $('#modalTitle').html('Economic Information for '+ countryName);
@@ -312,7 +309,9 @@ function displayCountryInfo(){
  }
 
  function displayCityMarkers(){
-
+  function formatNumber(num) {
+    return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+  }
   // Creating city icon
   var cityMarkerOps = L.ExtraMarkers.icon({
     icon: 'fa-circle-o',
@@ -322,12 +321,14 @@ function displayCountryInfo(){
   });
 let cityMarkers=[];
 for (var i = 0; i < cities.length; i++) {
-   let weatherIcon=weatherInfo[i][1][0]['icon'] ;
+  let population = formatNumber(cities[i]['population']);
+   let weatherIcon= weatherInfo[i][1][0]['icon'] ;
     let weatherIconLink='http://openweathermap.org/img/wn/'+weatherIcon+'@2x.png';
     let temp= (weatherInfo[i][0]['temp']).toFixed(1);
     let popup = L.popup()
-    .setContent(`<h6>${cities[i]['name']}</h6> 
-    <img src=${weatherIconLink} alt='weatherIcon' class='weatherPopup'> 
+    .setContent(`<h6 class='text-center'>${cities[i]['name']}</h6> 
+    <p class='tempPopup'>Population:</br> ${population}</p>
+    <img class='mx-auto d-block m-0' src=${weatherIconLink} alt='weatherIcon' class='weatherPopup'> 
     <p class='tempPopup'>${temp}&deg;C</p>`);
 
     let cityMarker = L.marker([cities[i]['lat'], cities[i]['lng']], {icon: cityMarkerOps});
@@ -342,31 +343,32 @@ for (var i = 0; i < cities.length; i++) {
 }); 
  }
 
- function displayCityInformation(){
-   let cityTableContent = `<table class='table table-hover'>
+ function displayWeatherInformation(){
+   let cityTableContent = `<table class='table table-hover' id='weatherTable'>
    <thead><tr>
    <td>city</td>
-   <td>size</td>
-   <td>conditions</td>
+   <td colspan="2">conditions</td>
    <td>temp</td>
    <td>feels like</td>
    </tr></thead>`;
 
    for (let i= 0; i< cities.length; i++){
+    if (weatherInfo[i]== null){continue;}
     let weatherIcon=weatherInfo[i][1][0]['icon'] ;
     let weatherIconLink='http://openweathermap.org/img/wn/'+weatherIcon+'@2x.png';
+    let description = weatherInfo[i][1][0]['description']
     let temp= (weatherInfo[i][0]['temp']).toFixed(1);
     let feelsLike= (weatherInfo[i][0]['feels_like']).toFixed(1);
     cityTableContent += 
     `<tr><td>${cities[i]['name']}</td>
-    <td>${cities[i]['population']}</td>
     <td><img class='weatherIcon' src=${weatherIconLink} alt='weather Icon'></td>
-    <td>${temp}</td>
-    <td>${feelsLike}</td></tr>`;
+    <td>${description}</td>
+    <td>${temp}&deg;C</td>
+    <td>${feelsLike}&deg;C</td></tr>`;
    }
    cityTableContent +="</table>"
    
-  $('#modalTitle').html('Cities in '+ countryName);
+  $('#modalTitle').html('Weather in '+ countryName);
   $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+flag+'>');
   $('#modal-body').empty();
   $("#modal-body").append(cityTableContent); 
@@ -374,17 +376,24 @@ for (var i = 0; i < cities.length; i++) {
  }
 
  function displayCovidData(){
-    let confirmed = covidData[0];
-    let critical = covidData[1];
-    let deaths = covidData[2];
-    let recovered= covidData[3];
-    let update =covidData[4]; 
+  function formatNumber(num) {
+    return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+  }
+  function formatDate(date){
+    let changedDate = date.substr(8, 2) + date.substr(4, 4) + date.substr(0, 4) + ' ' + date.substr(11, 5);
+    return changedDate;
+  }
+    let confirmed = formatNumber(covidData[0]);
+    let critical = formatNumber(covidData[1]);
+    let deaths = formatNumber(covidData[2]);
+    let recovered= formatNumber(covidData[3]);
+    let update = formatDate(covidData[4]); 
     let covidInfoContent = `<table class='table table-hover'>
-        <tr><td>Confirmed Cases:   </td><td>${confirmed}</td></tr> 
-        <tr><td>Critical Cases: </td><td>${critical}</td></tr> 
-        <tr><td>Deaths: </td><td>${deaths}</td></tr> 
-        <tr><td>Recovered: </td><td>${recovered}</td></tr> 
-        <tr><td>Last Update: </td><td>${update}</td></tr> 
+        <tr><td>Confirmed Cases</td><td>${confirmed}</td></tr> 
+        <tr><td>Critical Cases</td><td>${critical}</td></tr> 
+        <tr><td>Deaths</td><td>${deaths}</td></tr> 
+        <tr><td>Recovered</td><td>${recovered}</td></tr> 
+        <tr><td>Last Update</td><td>${update}</td></tr> 
         </table>`;
     
         $('#modalTitle').html('Covid-19 Data for '+ countryName)
@@ -394,17 +403,16 @@ for (var i = 0; i < cities.length; i++) {
  }
 
  function displayEmissionInfo(){
-   let methane= (Math.round(emissions[0]*100000))/100000;
-   let carbonmonoxide= (Math.round(emissions[1]*100000))/100000;
-   let ozone= (Math.round(emissions[2]*100000))/100000;;
-   let nitrogendioxide= (Math.round(emissions[3]*1000000))/1000000;
+   let methane= (Math.round(emissions[0]*100))/100;
+   let carbonmonoxide= (Math.round(emissions[1]*1000))/1000;
+   let ozone= (Math.round(emissions[2]*1000))/1000;;
+   let nitrogendioxide= (Math.round(emissions[3]*100000))/100000;
       let emissionInfoContent = `<table class="table table-hover">
-        <tr><td>Methane: </td><td>${methane}mol/m<sup>2</sup></td></tr> 
-        <tr><td>Carbonmonoxide: </td><td>${carbonmonoxide}mol/m<sup>2</sup></td></tr> 
-        <tr><td>Ozone: </td><td>${ozone}mol/m<sup>2</sup></td></tr> 
-        <tr><td>Nitrogendioxide: </td><td>${nitrogendioxide}mol/m<sup>2</sup></td></tr>
+        <tr><td>Methane </td><td>${methane}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Carbon Monoxide </td><td>${carbonmonoxide}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Ozone </td><td>${ozone}mol/m<sup>2</sup></td></tr> 
+        <tr><td>Nitrogen Dioxide </td><td>${nitrogendioxide}mol/m<sup>2</sup></td></tr>
         </table>`;
-    
         $('#modalTitle').html('Emissions (daily average in the last year) in '+ countryName)
         $('#modal-body').empty();
         $("#modal-body").append(emissionInfoContent); 
@@ -423,6 +431,11 @@ function getChargingPoints()  {
       },
     success: function(result) {
 
+      let elecStationsArr = result['electricData'];
+
+      if (elecStationsArr.length == 0) {
+        alert('No charging stations in this country recorded yet.');
+      } else {
       // Creating electric icon
       var elecMarkerOps = L.ExtraMarkers.icon({
         icon: 'fa-bolt',
@@ -431,8 +444,10 @@ function getChargingPoints()  {
         prefix: 'fa'
       });
       
-      let elecStationsArr = result['electricData'];
+      
       var markers = new L.MarkerClusterGroup();
+      console.log(result);
+      console.log(elecStationsArr[1]['AddressInfo'])
 
       for (var i = 0; i < elecStationsArr.length; i++) {
           let elecStation = elecStationsArr[i]['AddressInfo'];
@@ -442,15 +457,18 @@ function getChargingPoints()  {
             markers.addLayer(marker);
       };
       mymap.addLayer(markers);
+
       countryDropdown.change(function(){
         if (markers){
           mymap.removeLayer(markers);
         }
-      });  
+      }); 
+    } 
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
     }
+
   });  
 };
 

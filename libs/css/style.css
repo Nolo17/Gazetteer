@@ -30,11 +30,15 @@ h3.h3{text-align:center;padding:1.5em 0em 2em 0em;text-transform:capitalize;font
    z-index: 2;
 }
 
+#mapid {
+   position: absolute;
+   height: 90vh;
+   width: 100%;
+   border-radius: 0.5%;
+}
 
 #navBar{
-   /*height: 5vh; 
-   width: 100%; */
-   z-index: 1;
+   z-index: 999;
    padding: 10px;
    margin: 0%;
    background-color: rgb(58, 109, 97);
@@ -51,14 +55,18 @@ h3.h3{text-align:center;padding:1.5em 0em 2em 0em;text-transform:capitalize;font
    margin: 0 1.2em;
 }
 
-#mapid { 
-    height: 90vh;
-    /*margin-top: 12vh; */
-
- }
 #countryFlag{
    height: 30px;
    padding-left: 10px;
+}
+
+.modal-dialog{
+   cursor: default;
+}
+
+#modal-body{
+   max-height: 75vh;
+   overflow: auto;
 }
 
 thead{
@@ -70,6 +78,7 @@ thead{
 }
 .tempPopup{
    text-align: center;
+   font-size: 1.2em;
 }
 
 .weatherIcon {
