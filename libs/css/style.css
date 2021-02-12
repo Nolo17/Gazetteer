@@ -23,6 +23,8 @@ h3.h3{text-align:center;padding:1.5em 0em 2em 0em;text-transform:capitalize;font
 }
  body {
    background-color: rgb(58, 109, 97);
+   overflow: hidden;
+   margin: 0;   
  }
 
 #loadingEl{
@@ -32,15 +34,19 @@ h3.h3{text-align:center;padding:1.5em 0em 2em 0em;text-transform:capitalize;font
 
 #mapid {
    position: absolute;
-   height: 90vh;
+   height: 90%;
    width: 100%;
+   margin-top: 20px;
    border-radius: 0.5%;
+   margin: 0 auto;
+   z-index: -1;
+   
 }
 
 #navBar{
    z-index: 999;
-   padding: 10px;
-   margin: 0%;
+   margin:0;
+   padding: 5px;
    background-color: rgb(58, 109, 97);
 }
 
@@ -85,5 +91,11 @@ thead{
    height: 45px;
    text-align: center;
 }
+
+.leaflet-control.disabled{
+   opacity: .85;
+   pointer-events: none;
+ }
+ 
 
 

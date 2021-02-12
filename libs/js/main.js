@@ -1,4 +1,4 @@
-//var mymap = L.map('mapid').setView([51.505, -0.09], 13);
+
 let countryDropdown = $('#countryDropdown');
 
 //variables for general Info
@@ -24,6 +24,9 @@ let weatherInfo=[];
 
 //emission Variable
 let emissions=[];
+
+//variable for marker layers/ cluster groups
+let cityLayerGroup=[];
 
 
 var streetMapUrl ='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
@@ -77,51 +80,85 @@ var overlayMaps = {
 
 L.control.layers(baseLayers, overlayMaps).addTo(mymap);
 
+// Injecting info button into HTML
+
+let countryInfoButton = L.easyButton( '<i class="fas fa-info-circle"></i>', function(){
+  displayCountryInfo();
+}
+);
+
+
+let economicButton = L.easyButton( 'fa-usd', function(){
+  displayEconomicInfo()
+});
+
+
+let cityMarkerButton = L.easyButton( 'fa-city', function(){
+  displayCityMarkers(); 
+});
+
+var toggle = L.easyButton({
+  states: [{
+    stateName: 'add-markers',
+    icon: 'fa-city',
+    title: 'add city markers',
+    onClick: function(control) {
+      scatteredMarkerMap.addLayer(markerGroup);
+      control.state('remove-markers');
+    }
+  }, {
+    icon: 'fa-undo',
+    stateName: 'remove-markers',
+    onClick: function(control) {
+      scatteredMarkerMap.removeLayer(markerGroup);
+      control.state('add-markers');
+    },
+    title: 'remove markers'
+  }]
+});
+
+let weatherButton =L.easyButton( '<i class="fas fa-cloud-sun"></i>', function(){
+  displayWeatherInformation();
+});
+
+let covidButton = L.easyButton( '<i class="fas fa-virus"></i>', function(){
+  displayCovidData();
+});
+
+let emissionButton = L.easyButton('<i class="fas fa-smog"></i>', function(){
+  displayEmissionInfo();
+});
+
+let electricButton = L.easyButton('<i class="fas fa-charging-station"></i>', function(){
+  getChargingPoints();
+});
+
+buttonArray= [countryInfoButton, economicButton, cityMarkerButton, weatherButton, covidButton, emissionButton, electricButton];
+
+
+countryDropdown.change(function() {
+  //getCountryBorders($('#countryDropdown option:selected').text());
+  getData(countryDropdown.val()); 
+});
+
+
 function main(){
 
 $('#loadingEl').show();
 
+countryInfoButton.addTo(mymap); 
+economicButton.addTo(mymap);
+cityMarkerButton.addTo(mymap);
+weatherButton.addTo(mymap);
+covidButton.addTo(mymap); 
+emissionButton.addTo(mymap);
+electricButton.addTo(mymap);
+
 getCountrySelect();
-
 getLocation();
-
-// Injecting info button into HTML
-
-L.easyButton( '<i class="fas fa-info-circle"></i>', function(){
-  displayCountryInfo();
-}
-).addTo(mymap); 
-
-L.easyButton( 'fa-usd', function(){
-  displayEconomicInfo()
-}).addTo(mymap); 
-
-L.easyButton( 'fa-city', function(){
-  displayCityMarkers(); 
-}).addTo(mymap);
-
-L.easyButton( '<i class="fas fa-cloud-sun"></i>', function(){
-  displayWeatherInformation();
-}).addTo(mymap);
-
-L.easyButton( '<i class="fas fa-virus"></i>', function(){
-  displayCovidData();
-}).addTo(mymap); 
-
-L.easyButton('<i class="fas fa-smog"></i>', function(){
-  displayEmissionInfo();
-}).addTo(mymap);
-
-L.easyButton('<i class="fas fa-charging-station"></i>', function(){
-  getChargingPoints();
-}).addTo(mymap);
-
-countryDropdown.change(function() {
-  getData(countryDropdown.val()); 
-});
-
 $('#loadingEl').hide();
 };
+
 
 //  get country select menu
 function getCountrySelect()  {
@@ -227,6 +264,12 @@ function getCountrySelect()  {
 
 
 function getData(countryCode){
+  mymap.spin(true, {lines: 15, length: 50});
+  for (let i= 0; i < buttonArray.length; i++){
+    buttonArray[i].disable();
+  }
+  getCountryBorders($('#countryDropdown option:selected').text());
+  console.log('disable');
   const d = new Date();
   const startdate = (d.getFullYear()-1)+'-'+(d.getMonth()+1)+'-'+d.getDate(); 
   const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
@@ -253,14 +296,17 @@ function getData(countryCode){
         cities = result ['cityData'];
         weatherInfo= result['weatherData'];
         covidData=result['covidData']
-        emissions=result['emissionData'];
-        let country= countryName;
-        getCountryBorders(country);       
+        emissions=result['emissionData']; 
+        console.log('enable');
+        for (let i= 0; i < buttonArray.length; i++){
+          buttonArray[i].enable();
+        };      
       }
-    
+      mymap.spin(false);
     },
     error: function(jqXHR, textStatus, errorThrown) {
-      console.log(jqXHR + textStatus +  errorThrown)
+      console.log(jqXHR + textStatus +  errorThrown);
+      mymap.spin(false);
     }
   });
 }
@@ -336,7 +382,7 @@ for (var i = 0; i < cities.length; i++) {
       cityMarker.bindPopup(popup);
       cityMarkers.push(cityMarker);
     };
-    let cityLayerGroup = L.layerGroup(cityMarkers);
+    cityLayerGroup = L.layerGroup(cityMarkers);
     mymap.addLayer(cityLayerGroup)
     countryDropdown.change(function(){
     mymap.removeLayer(cityLayerGroup);
