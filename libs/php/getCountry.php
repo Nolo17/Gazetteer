@@ -74,8 +74,6 @@
 	$output['weatherData'] = $weatherCities;
 
 	
-	
-	
 
 	$covidUrl = 'https://covid19-api.com/country/code?code='.$_REQUEST['country'].'&format=json';
 	curl_setopt($ch, CURLOPT_URL, $covidUrl);
@@ -107,24 +105,6 @@
 	$worldBankCode = $worldBankResult['worldBank'];	
 	$output['worldBankData'] = $worldBankResult[1][0]['incomeLevel']['value'];
 
-	$emissionArray=[];
-
-    $products = ['methane', 'carbonmonoxide', 'ozone','nitrogendioxide'];
-
-    foreach($products as $product){
-        $emissionUrl = 'https://api.v2.emissions-api.org/api/v2/'.$product.'/statistics.json?country='.$_REQUEST['country'].'&interval=year&begin='.$_REQUEST['startDate'].'&end='.$_REQUEST['endDate'].'&limit=1';
-	    curl_setopt($ch, CURLOPT_URL, $emissionUrl);
-
-	   $emissionResponse=curl_exec($ch);
-
-	   $emissionResult = json_decode($emissionResponse,true);
-	   $emission= $emissionResult[0]['value']['average'];
-       array_push($emissionArray,$emission);
-
-	}
-
-	curl_close($ch);
-	$output['emissionData'] = $emissionArray;
 
 	$output['status']['code'] = "200";
 	$output['status']['name'] = "ok";

@@ -21,37 +21,77 @@ h3.h3{text-align:center;padding:1.5em 0em 2em 0em;text-transform:capitalize;font
 @keyframes change_last_circle{
     50%{transform:rotateX(360deg) scale(.8)}
 }
- body {
-   background-color: rgb(58, 109, 97);
-   overflow: hidden;
-   margin: 0;   
- }
-
 #loadingEl{
    height: 100vh;
    z-index: 2;
 }
 
-#mapid {
-   position: absolute;
-   height: 100%;
+ html, body {
+   background-color: rgb(58, 109, 97);
+   overflow: hidden;  
    width: 100%;
-   margin-top: 20px;
+ }
+ .row{ display: flex; align-items: center;}
+
+ div#navBar{
+   z-index: 999 !important;
+   background-color: rgb(58, 109, 97);
+   width: 100%;
+   height: 10vh;
+   padding: 5px;
+   display: flex;
+   justify-content: center;
+   text-align: center;
+  
+}
+
+
+
+
+#mapid {
+   top: 10vh;
+   height: 90%;
+   width: 100%;
+   position: absolute;
    border-radius: 0.5%;
    margin: 0 auto;
-   z-index: -1;
+   /*
+   
+   
+   z-index: -1;  
+   display: flex; */
    
 }
 
-#navBar{
-   z-index: 999;
-   margin:0;
-   padding: 5px;
-   background-color: rgb(58, 109, 97);
-}
+@media only screen and (max-width: 600px) {
+   div#navBar {
+      height: 18vh;
+      padding: 0;
+      padding-top: 2%;
+    }
+    
+   #mapid {
+      top: 18vh;
+      height: 82vh;
+    }
+ } 
+
+ /*@media screen and (max-width: 1500px) and (min-width: 600px) {
+   div#navBar {
+      padding-top: 1.3em;
+      height: 7vh;
+   }
+   #mapid {
+      top: 7vh;
+      height: 93vh;
+    }
+ } */
+
+
 
 #titleH {
    margin: 0 1.2em;
+   justify-content: center;
 }
 #countryDropdown {
    margin: 0 1.2em;

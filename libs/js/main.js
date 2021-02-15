@@ -22,11 +22,9 @@ let cities=[];
 //weatherVariable
 let weatherInfo=[];
 
-//emission Variable
-let emissions=[];
-
 //variable for marker layers/ cluster groups
 let cityLayerGroup=[];
+let markers=[];
 
 
 var streetMapUrl ='https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
@@ -38,7 +36,7 @@ var streetMap = L.tileLayer(streetMapUrl, {attribution: streetMapAttrib}),
     satMap = L.tileLayer(satMapUrl, {attribution: satMapAttrib});
 
 var mymap = L.map('mapid', {
-     layers: [streetMap] ,// only add one!
+     layers: [streetMap] ,
      maxZoom: 18,
     id: 'mapbox/streets-v11',
     tileSize: 512,
@@ -78,7 +76,6 @@ var overlayMaps = {
   'wind': windMap
 };
 
-L.control.layers(baseLayers, overlayMaps).addTo(mymap);
 
 // Injecting info button into HTML
 
@@ -97,26 +94,6 @@ let cityMarkerButton = L.easyButton( 'fa-city', function(){
   displayCityMarkers(); 
 });
 
-var toggle = L.easyButton({
-  states: [{
-    stateName: 'add-markers',
-    icon: 'fa-city',
-    title: 'add city markers',
-    onClick: function(control) {
-      scatteredMarkerMap.addLayer(markerGroup);
-      control.state('remove-markers');
-    }
-  }, {
-    icon: 'fa-undo',
-    stateName: 'remove-markers',
-    onClick: function(control) {
-      scatteredMarkerMap.removeLayer(markerGroup);
-      control.state('add-markers');
-    },
-    title: 'remove markers'
-  }]
-});
-
 let weatherButton =L.easyButton( '<i class="fas fa-cloud-sun"></i>', function(){
   displayWeatherInformation();
 });
@@ -126,7 +103,7 @@ let covidButton = L.easyButton( '<i class="fas fa-virus"></i>', function(){
 });
 
 let emissionButton = L.easyButton('<i class="fas fa-smog"></i>', function(){
-  displayEmissionInfo();
+  getEmissions();
 });
 
 let electricButton = L.easyButton('<i class="fas fa-charging-station"></i>', function(){
@@ -137,7 +114,6 @@ buttonArray= [countryInfoButton, economicButton, cityMarkerButton, weatherButton
 
 
 countryDropdown.change(function() {
-  //getCountryBorders($('#countryDropdown option:selected').text());
   getData(countryDropdown.val()); 
 });
 
@@ -145,6 +121,8 @@ countryDropdown.change(function() {
 function main(){
 
 $('#loadingEl').show();
+
+L.control.layers(baseLayers, overlayMaps).addTo(mymap);
 
 countryInfoButton.addTo(mymap); 
 economicButton.addTo(mymap);
@@ -210,18 +188,7 @@ function getCountrySelect()  {
       
       if (result.status.name == "ok") {
         let countryCode = result['countryCodeData'];
-        console.log(countryCode);
         $('#countryDropdown').val(countryCode);
-        var positionMarkerOps = L.ExtraMarkers.icon({
-          icon: 'fa-location-arrow',
-          markerColor: 'yellow',
-          shape: 'circle',
-          prefix: 'fa'
-        });
-        
-        let positionMarker = L.marker([position.coords.latitude, position.coords.longitude], {icon: positionMarkerOps}).addTo(mymap);
-            positionMarker.bindPopup('You are here').addTo(mymap); 
-            
             getData(countryCode);
       } 
     
@@ -264,28 +231,21 @@ function getCountrySelect()  {
 
 
 function getData(countryCode){
-  mymap.spin(true, {lines: 15, length: 50});
+  mymap.spin(true);
   for (let i= 0; i < buttonArray.length; i++){
     buttonArray[i].disable();
   }
   getCountryBorders($('#countryDropdown option:selected').text());
-  console.log('disable');
-  const d = new Date();
-  const startdate = (d.getFullYear()-1)+'-'+(d.getMonth()+1)+'-'+d.getDate(); 
-  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
   $.ajax({
     url: "libs/php/getCountry.php",
     type: 'POST',
     dataType: 'json',
     data: {
         country: countryCode,
-        startDate: startdate,
-        endDate: enddate
       },
     success: function(result) {
 
       if (result.status.name == "ok") {
-        console.log(result);
         countryInfo=result['countryInfoData'];
         countryName= result['countryInfoData'][3]; 
         lang = result['restCountriesData'][1];
@@ -296,8 +256,6 @@ function getData(countryCode){
         cities = result ['cityData'];
         weatherInfo= result['weatherData'];
         covidData=result['covidData']
-        emissions=result['emissionData']; 
-        console.log('enable');
         for (let i= 0; i < buttonArray.length; i++){
           buttonArray[i].enable();
         };      
@@ -330,7 +288,7 @@ function displayCountryInfo(){
          <tr><td>Population </td><td>${population}</td></tr>
          <tr><td>Size in km<sup>2</sup></td><td> ${size}</td></tr>
          </table>
-         <a href=${wikiLink} target="_blank">Read more on Wikipedia</a>`;
+         <a href=${wikiLink} target="_blank">Find out more on Wikipedia</a>`;
         $('#modalTitle').html(countryName);
         $('#modalTitle').append('<img id="countryFlag" alt="Flag of Country" src='+flag+'>');
         $('#modal-body').empty();
@@ -355,6 +313,12 @@ function displayCountryInfo(){
  }
 
  function displayCityMarkers(){
+  if (markers){
+    mymap.removeLayer(markers);
+  }
+   if(cityLayerGroup){
+    mymap.removeLayer(cityLayerGroup);
+};
   function formatNumber(num) {
     return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
   }
@@ -382,6 +346,8 @@ for (var i = 0; i < cities.length; i++) {
       cityMarker.bindPopup(popup);
       cityMarkers.push(cityMarker);
     };
+   
+
     cityLayerGroup = L.layerGroup(cityMarkers);
     mymap.addLayer(cityLayerGroup)
     countryDropdown.change(function(){
@@ -448,11 +414,26 @@ for (var i = 0; i < cities.length; i++) {
         $('#myModal').modal('toggle');    
  }
 
- function displayEmissionInfo(){
-   let methane= (Math.round(emissions[0]*100))/100;
-   let carbonmonoxide= (Math.round(emissions[1]*1000))/1000;
-   let ozone= (Math.round(emissions[2]*1000))/1000;;
-   let nitrogendioxide= (Math.round(emissions[3]*100000))/100000;
+ function getEmissions(){
+  mymap.spin(true);
+  const d = new Date();
+  const startdate = (d.getFullYear()-1)+'-'+(d.getMonth()+1)+'-'+d.getDate(); 
+  const enddate=  d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+  $.ajax({
+    url: "libs/php/getemissions.php",
+    type: 'POST',
+    dataType: 'json',
+    data: {
+      country: $('#countryDropdown').val(),
+      startDate: startdate,
+      endDate: enddate
+      },
+    success: function(result) {
+      let emissions=result['emissionData']; 
+      let methane= (Math.round(emissions[0]*100))/100;
+      let carbonmonoxide= (Math.round(emissions[1]*1000))/1000;
+      let ozone= (Math.round(emissions[2]*1000))/1000;;
+      let nitrogendioxide= (Math.round(emissions[3]*100000))/100000;
       let emissionInfoContent = `<table class="table table-hover">
         <tr><td>Methane </td><td>${methane}mol/m<sup>2</sup></td></tr> 
         <tr><td>Carbon Monoxide </td><td>${carbonmonoxide}mol/m<sup>2</sup></td></tr> 
@@ -463,17 +444,31 @@ for (var i = 0; i < cities.length; i++) {
         $('#modal-body').empty();
         $("#modal-body").append(emissionInfoContent); 
         $('#myModal').modal('toggle');
+        mymap.spin(false);
+    },
+    error: function(jqXHR, textStatus, errorThrown) {
+      console.log(jqXHR + textStatus +  errorThrown)
+      mymap.spin(false);
+    }
 
- }
+  });  
+};
 
  // get Charging Points for electric cars
 function getChargingPoints()  {
+  mymap.spin(true);
+  if(cityLayerGroup){
+    mymap.removeLayer(cityLayerGroup);
+};
+  if (markers){
+    mymap.removeLayer(markers);
+  }
   $.ajax({
     url: "libs/php/getChargingStations.php",
     type: 'POST',
     dataType: 'json',
     data: {
-      countryCode: $('#countryDropdown').val(),
+      countryCode: countryDropdown.val(),
       },
     success: function(result) {
 
@@ -481,6 +476,7 @@ function getChargingPoints()  {
 
       if (elecStationsArr.length == 0) {
         alert('No charging stations in this country recorded yet.');
+        mymap.spin(false);
       } else {
       // Creating electric icon
       var elecMarkerOps = L.ExtraMarkers.icon({
@@ -491,10 +487,7 @@ function getChargingPoints()  {
       });
       
       
-      var markers = new L.MarkerClusterGroup();
-      console.log(result);
-      console.log(elecStationsArr[1]['AddressInfo'])
-
+      markers = new L.MarkerClusterGroup();
       for (var i = 0; i < elecStationsArr.length; i++) {
           let elecStation = elecStationsArr[i]['AddressInfo'];
           let title = elecStation['Title'];
@@ -503,6 +496,7 @@ function getChargingPoints()  {
             markers.addLayer(marker);
       };
       mymap.addLayer(markers);
+      mymap.spin(false);
 
       countryDropdown.change(function(){
         if (markers){
@@ -513,6 +507,7 @@ function getChargingPoints()  {
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log(jqXHR + textStatus +  errorThrown)
+      mymap.spin(false);
     }
 
   });  
